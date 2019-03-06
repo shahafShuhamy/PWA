@@ -9,3 +9,7 @@ Once Node.js is installed, open your command prompt or terminal and **navigate i
 Finally, run `npm start` to start the development server and visit [localhost:8080](http://localhost:8080) to see the running application.
 
 firebase Account is for personal DataBase in order to give the application "live" feeling.
+
+# Maintenence
+## change code in server "functions"
+in order to change code in the server functions we use firebase -> 'firebase deploy'.

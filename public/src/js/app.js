@@ -48,13 +48,57 @@ function displayConfirmNotification() {
   }
 }
 
-function asForNotificationPermission() {                                              // personal-without service worker Notification
+function configurePushSub() {
+  if ('serviceWorker' in navigator) {
+    let reg;
+    navigator.serviceWorker.ready 
+      .then( (swreg) => {
+        reg = swreg;
+        return swreg.pushManager.getSubscription();                                 // if this device-browser have subscriptions - since its a combination
+      })
+      .then( (sub) => {
+        if (sub === null) {
+          let vapidPKey = 
+          'BJ6ACh89esk36eZDm4E7cZThiimE77E4DrdnYjgCRrGUmEcDv3-NeqJhc3E9tAEB6OtXFN8H4KVncVmjIEQeV58';
+          let convertedKey = urlBase64ToUint8Array(vapidPKey);
+          return reg.pushManager.subscribe({
+            userVisibleOnly: true,                                                  // only server can send push messages
+            applicationServerKey: convertedKey
+          });
+        } else {
+
+        }
+      })
+    .then( (newSub) => {
+      return fetch('https://pwagram-bff28.firebaseio.com/subscriptions.json',{      // create subscription at data base  
+        method: 'POST',                                                             // firebase personaly create a auth key and a 256 key
+        headers: {                                                                  // that we as an app must send in order to verify client-server
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(newSub)
+      })
+      .then( (res) => {
+        if (res.ok){
+          displayConfirmNotification();
+        }
+      })
+      .catch( (err) => {
+        console.log(err);
+      });
+  });
+  }
+}
+
+
+function asForNotificationPermission() {                                            // personal-without service worker Notification
   Notification.requestPermission((result) => {
     console.log('user choise', result);
     if (result !== 'granted') {
       console.log('no notification perission granted!', result);
     } else {
-        displayConfirmNotification();
+      configurePushSub();
+  // displayConfirmNotification();
     }
   });
 }

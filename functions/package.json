@@ -4,6 +4,7 @@
   "scripts": {
     "serve": "firebase serve --only functions",
     "shell": "firebase functions:shell",
+    "web-push": "web-push",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
@@ -11,7 +12,8 @@
   "dependencies": {
     "cors": "^2.8.5",
     "firebase-admin": "^7.0.0",
-    "firebase-functions": "^2.2.0"
+    "firebase-functions": "^2.2.0",
+    "web-push": "^3.3.3"
   },
   "private": true
 }

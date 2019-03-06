@@ -1,7 +1,7 @@
 importScripts('/src/js/idb.js');
 importScripts('/src/js/utility.js');
 
-var CACHE_STATIC_NAME = 'static-v23';
+var CACHE_STATIC_NAME = 'static-v27';
 var CACHE_DYNAMIC_NAME = 'dynamic-v2';
 var STATIC_FILES = [
   '/',
@@ -9,9 +9,9 @@ var STATIC_FILES = [
   '/offline.html',
   '/src/js/app.js',
   '/src/js/feed.js',
+  '/src/js/idb.js',
   '/src/js/promise.js',
   '/src/js/fetch.js',
-  '/src/js/idb.js',
   '/src/js/material.min.js',
   '/src/css/app.css',
   '/src/css/feed.css',
@@ -20,6 +20,19 @@ var STATIC_FILES = [
   'https://fonts.googleapis.com/icon?family=Material+Icons',
   'https://cdnjs.cloudflare.com/ajax/libs/material-design-lite/1.3.0/material.indigo-pink.min.css'
 ];
+
+// function trimCache(cacheName, maxItems) {
+//   caches.open(cacheName)
+//     .then(function (cache) {
+//       return cache.keys()
+//         .then(function (keys) {
+//           if (keys.length > maxItems) {
+//             cache.delete(keys[0])
+//               .then(trimCache(cacheName, maxItems));
+//           }
+//         });
+//     })
+// }
 
 self.addEventListener('install', function (event) {
   console.log('[Service Worker] Installing Service Worker ...', event);
@@ -50,8 +63,9 @@ self.addEventListener('activate', function (event) {
 
 function isInArray(string, array) {
   var cachePath;
-  if (string.indexOf(self.origin) === 0) {                                // request targets domain where we serve the page from (i.e. NOT a CDN)
-    cachePath = string.substring(self.origin.length);                     // take the part of the URL AFTER the domain (e.g. after localhost:8080)
+  if (string.indexOf(self.origin) === 0) { // request targets domain where we serve the page from (i.e. NOT a CDN)
+    console.log('matched ', string);
+    cachePath = string.substring(self.origin.length); // take the part of the URL AFTER the domain (e.g. after localhost:8080)
   } else {
     cachePath = string; // store the full request (for CDNs)
   }
@@ -59,21 +73,21 @@ function isInArray(string, array) {
 }
 
 self.addEventListener('fetch', function (event) {
-  var url = 'https://pwagram-bff28.firebaseio.com/posts.json';
 
+  var url = 'https://pwagram-bff28.firebaseio.com/posts.json';
   if (event.request.url.indexOf(url) > -1) {
     event.respondWith(fetch(event.request)
       .then(function (res) {
-        let clonedRes = res.clone();
+        var clonedRes = res.clone();
         clearAllData('posts')
-          .then( () => {
-            return clonedRes.json()
-            })
-            .then( (data) => {
-              for (var key in data) {
-                writeData('posts', data[key]);
-              }
-            });
+          .then(function () {
+            return clonedRes.json();
+          })
+          .then(function (data) {
+            for (var key in data) {
+              writeData('posts', data[key])
+            }
+          });
         return res;
       })
     );
@@ -110,20 +124,6 @@ self.addEventListener('fetch', function (event) {
     );
   }
 });
-
-// function trimCache(cacheName, maxItems) {
-//   caches.open(cacheName)
-//     .then(function (cache) {
-//       return cache.keys()
-//         .then(function (keys) {
-//           if (keys.length > maxItems) {
-//             cache.delete(keys[0])
-//               .then(trimCache(cacheName, maxItems));
-//           }
-//         });
-//     })
-// }
-
 // self.addEventListener('fetch', function(event) {
 //   event.respondWith(
 //     caches.match(event.request)
@@ -179,15 +179,16 @@ self.addEventListener('fetch', function (event) {
 //     fetch(event.request)
 //   );
 // });
-self.addEventListener('sync', (event) => {
+
+self.addEventListener('sync', function(event) {
   console.log('[Service Worker] Background syncing', event);
   if (event.tag === 'sync-new-posts') {
     console.log('[Service Worker] Syncing new Posts');
     event.waitUntil(
       readAllData('sync-posts')
-        .then( (data) => {
-          for (let dt of data) {
-            fetch('https://us-central1-pwagram-bff28.cloudfunctions.net/helloWorld' , {
+        .then(function(data) {
+          for (var dt of data) {
+            fetch('https://us-central1-pwagram-bff28.cloudfunctions.net/helloWorld', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -197,40 +198,79 @@ self.addEventListener('sync', (event) => {
                 id: dt.id,
                 title: dt.title,
                 location: dt.location,
-                image: 'image-location'
+                image: 'image'
               })
             })
-            .then( (res) => {
-              console.log('Send Data', res);
-              if(res.ok) {
-                res.json()
-                  .then( (resData) => {
-                    deleteItem('sync-posts', resData.id);
-                  })
-              }
-          })
-          .catch ((err) => {
-            console.log('Error while sending data', err);
-          })
-        }
-      })
+              .then(function(res) {
+                console.log('Sent data', res);
+                if (res.ok) {
+                  res.json()
+                    .then(function(resData) {
+                      deleteItemFromData('sync-posts', resData.id);
+                    });
+                }
+              })
+              .catch(function(err) {
+                console.log('Error while sending data', err);
+              });
+          }
+
+        })
     );
   }
-})
+});
 
-self.addEventListener('notificationclick', (event) => {                             // listen to actions
-  let notification = event.notification;
-  let action = event.action;
+self.addEventListener('notificationclick', function(event) {
+  var notification = event.notification;
+  var action = event.action;
+
   console.log(notification);
+
   if (action === 'confirm') {
     console.log('Confirm was chosen');
     notification.close();
   } else {
-    console.log(action);
+    console.log(action);                                                            // when user dosent want to confirm notifications
+    event.waitUntil(                                                                // redirect it to some place else
+      clients.matchAll()
+        .then( (foundClients) => {
+          let client = foundClients.find( (c) => {
+            return c.visibilityState === 'visible';
+          });
+          if (client !== undefined) {
+            client.navigate('notification.data.url');
+            client.focus();
+          } else {
+            clients.openWindow('notification.data.url');
+          }
+          notification.close();
+        })
+    );
     notification.close();
   }
 });
 
-self.addEventListener('notificationclose', (event)=> {
-  console.log('Notification Was Closed', event);
-})
+self.addEventListener('notificationclose', function(event) {
+  console.log('Notification was closed', event);
+});
+
+self.addEventListener('push', (event) => {
+  console.log('Push Notification', event);
+  let data = {title: 'NEW!', content: 'Something new Happend', openUrl: '/'};
+  if (event.data) {
+    data = JSON.parse(event.data.text());
+  }
+
+  let options = {
+    body: data.content,
+    icon: '/src/images/icons/app-icon-96x96',
+    badge: '/src/images/icons/app-icon-96x96',
+    data: {
+      url: data.openUrl
+    } 
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
